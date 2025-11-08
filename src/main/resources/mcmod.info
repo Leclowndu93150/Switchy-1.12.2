@@ -1,0 +1,13 @@
+[{
+    "modid": "switchy",
+    "name": "Switchy",
+    "description": "A server-side utility mod for managing multiple player profiles with different inventories, stats, and locations.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "logoFile": "",
+    "url": "https://modrinth.com/mod/switchy",
+    "authorList": ["Sisby"],
+    "credits": "Original Fabric 1.20 version by Sisby",
+    "dependencies": [],
+    "mixinConfigs": ["mixins.switchy.json"]
+}]

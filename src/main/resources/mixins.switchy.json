@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.sisby.switchy.mixin",
+  "refmap": "mixins.switchy.refmap.json",
+  "target": "@env(DEFAULT)",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": [
+    "MixinEntityPlayerMP",
+    "MixinPlayerList"
+  ]
+}
