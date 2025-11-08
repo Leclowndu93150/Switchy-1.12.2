@@ -373,8 +373,6 @@ minecraft {
                 '-Dmixin.checks.interfaces=true',
                 '-Dmixin.debug.export=true'
         ])
-        extraRunJvmArguments.add("-Dmixin.env.remapRefMap=true")
-        extraRunJvmArguments.add("-Dmixin.env.refMapRemappingFile=${projectDir}/build/createSrgToMcp/output.srg")
     }
 
     if (enableCoreModDebug.toBoolean()) {
@@ -840,8 +838,6 @@ def getManifestAttributes() {
 
     if (usesMixins.toBoolean()) {
         attributes['ForceLoadAsMod'] = !containsMixinsAndOrCoreModOnly.toBoolean()
-        attributes['MixinConfigs'] = "mixins.${modId}.json"
-        attributes['IEarlyMixinLoader'] = "${modGroup}.SwitchyEarlyMixinLoader"
     }
     return attributes
 }

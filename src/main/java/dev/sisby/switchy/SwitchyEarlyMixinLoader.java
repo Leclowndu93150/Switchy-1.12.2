@@ -23,12 +23,12 @@ public class SwitchyEarlyMixinLoader implements IEarlyMixinLoader, IFMLLoadingPl
 
     @Override
     public String getModContainerClass() {
-        return "";
+        return null;
     }
 
     @Override
     public @Nullable String getSetupClass() {
-        return "";
+        return null;
     }
 
     @Override
@@ -38,6 +38,6 @@ public class SwitchyEarlyMixinLoader implements IEarlyMixinLoader, IFMLLoadingPl
 
     @Override
     public String getAccessTransformerClass() {
-        return "";
+        return null;
     }
 }
