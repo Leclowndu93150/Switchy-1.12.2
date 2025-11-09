@@ -173,6 +173,54 @@ public class SwitchyComponentTypes extends TypeRegistry<SwitchyComponentType<?>>
                 .previewPriority(4);
         });
         
+        registerStatic(SPAWN_X, (SwitchyComponentType.Builder<Integer> builder) -> {
+            return builder
+                .nbtSwitcher("SpawnX", NBTSerializers.INT)
+                .textProvider(x -> new TextComponentString(String.valueOf(x)))
+                .group(new ResourceLocation("minecraft", "spawn"))
+                .previewPriority(3);
+        });
+        
+        registerStatic(SPAWN_Y, (SwitchyComponentType.Builder<Integer> builder) -> {
+            return builder
+                .nbtSwitcher("SpawnY", NBTSerializers.INT)
+                .textProvider(y -> new TextComponentString(String.valueOf(y)))
+                .group(new ResourceLocation("minecraft", "spawn"))
+                .hidden(true);
+        });
+        
+        registerStatic(SPAWN_Z, (SwitchyComponentType.Builder<Integer> builder) -> {
+            return builder
+                .nbtSwitcher("SpawnZ", NBTSerializers.INT)
+                .textProvider(z -> new TextComponentString(String.valueOf(z)))
+                .group(new ResourceLocation("minecraft", "spawn"))
+                .hidden(true);
+        });
+        
+        registerStatic(SPAWN_DIMENSION, (SwitchyComponentType.Builder<Integer> builder) -> {
+            return builder
+                .nbtSwitcher("SpawnDimension", NBTSerializers.INT)
+                .textProvider(dim -> new TextComponentString("Dim " + dim))
+                .group(new ResourceLocation("minecraft", "spawn"))
+                .previewPriority(2);
+        });
+        
+        registerStatic(SPAWN_FORCED, (SwitchyComponentType.Builder<Boolean> builder) -> {
+            return builder
+                .nbtSwitcher("SpawnForced", NBTSerializers.BOOLEAN)
+                .textProvider(forced -> new TextComponentString(forced ? "Forced" : "Not Forced"))
+                .group(new ResourceLocation("minecraft", "spawn"))
+                .hidden(true);
+        });
+        
+        registerStatic(SPAWN_ANGLE, (SwitchyComponentType.Builder<Float> builder) -> {
+            return builder
+                .nbtSwitcher("SpawnAngle", NBTSerializers.FLOAT)
+                .textProvider(angle -> new TextComponentString(String.format("%.1f°", angle)))
+                .group(new ResourceLocation("minecraft", "spawn"))
+                .hidden(true);
+        });
+        
         Switchy.LOGGER.info("Registered {} component types", STATIC.values().size());
     }
 

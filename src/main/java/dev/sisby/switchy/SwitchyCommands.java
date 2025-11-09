@@ -10,6 +10,7 @@ import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
@@ -18,7 +19,10 @@ import net.minecraft.util.text.TextFormatting;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class SwitchyCommands extends CommandBase {
     @Override
@@ -28,7 +32,7 @@ public class SwitchyCommands extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/switchy [list|switch <profile>|view <profile>|delete <profile>]";
+        return "/switchy [list|switch <profile>|view <profile>|delete <profile>|rename <profile> <new_id>|components [enable|disable] <id>]";
     }
 
     @Override
@@ -74,8 +78,14 @@ public class SwitchyCommands extends CommandBase {
                 }
                 deleteProfile(player, data, args[1].toLowerCase());
                 break;
+            case "rename":
+                if (args.length < 3) {
+                    throw new CommandException("Usage: /switchy rename <profile> <new_id>");
+                }
+                renameProfile(player, data, args[1].toLowerCase(), args[2].toLowerCase());
+                break;
             case "components":
-                listComponents(player, data);
+                handleComponentsCommand(player, data, args);
                 break;
             default:
                 player.sendMessage(new TextComponentString(getUsage(sender)));
@@ -97,13 +107,30 @@ public class SwitchyCommands extends CommandBase {
         }
 
         if (args.length == 1) {
-            return getListOfStringsMatchingLastWord(args, "list", "switch", "view", "delete", "components");
+            return getListOfStringsMatchingLastWord(args, "list", "switch", "view", "delete", "rename", "components");
         }
 
         if (args.length == 2) {
             String subcommand = args[0].toLowerCase();
             if (subcommand.equals("switch") || subcommand.equals("view") || subcommand.equals("delete")) {
                 return getListOfStringsMatchingLastWord(args, data.keySet());
+            } else if (subcommand.equals("rename")) {
+                return getListOfStringsMatchingLastWord(args, data.keySet());
+            } else if (subcommand.equals("components")) {
+                return getListOfStringsMatchingLastWord(args, "enable", "disable");
+            }
+        }
+
+        if (args.length == 3) {
+            String subcommand = args[0].toLowerCase();
+            if (subcommand.equals("components")) {
+                boolean disable = "disable".equalsIgnoreCase(args[1]);
+                boolean enable = "enable".equalsIgnoreCase(args[1]);
+                if (enable || disable) {
+                    return getListOfStringsMatchingLastWord(args, getComponentSuggestions(data, disable));
+                }
+            } else if (subcommand.equals("rename")) {
+                return getListOfStringsMatchingLastWord(args, Collections.singletonList("new_id"));
             }
         }
 
@@ -196,6 +223,33 @@ public class SwitchyCommands extends CommandBase {
         }
     }
 
+    private void renameProfile(EntityPlayerMP player, SwitchyPlayerData data, String oldId, String newId) throws CommandException {
+        try {
+            data.renameProfile(oldId, newId);
+
+            TextComponentString message = prefix();
+            TextComponentString body = new TextComponentString("Renamed profile ");
+            body.getStyle().setColor(TextFormatting.GRAY);
+            message.appendSibling(body);
+
+            TextComponentString oldName = new TextComponentString(oldId);
+            oldName.getStyle().setColor(TextFormatting.YELLOW);
+            message.appendSibling(oldName);
+
+            TextComponentString separator = new TextComponentString(" to ");
+            separator.getStyle().setColor(TextFormatting.GRAY);
+            message.appendSibling(separator);
+
+            TextComponentString newName = new TextComponentString(newId);
+            newName.getStyle().setColor(TextFormatting.GREEN);
+            message.appendSibling(newName);
+
+            player.sendMessage(message);
+        } catch (IllegalArgumentException e) {
+            throw new CommandException(e.getMessage());
+        }
+    }
+
     private void listComponents(EntityPlayerMP player, SwitchyPlayerData data) {
         TextComponentString header = new TextComponentString("=== Enabled Components ===");
         header.getStyle().setColor(TextFormatting.BLUE).setBold(true);
@@ -211,11 +265,165 @@ public class SwitchyCommands extends CommandBase {
             
             player.sendMessage(line);
         }
+
+        TextComponentString tip = new TextComponentString("Use /switchy components enable|disable <id>");
+        tip.getStyle().setColor(TextFormatting.GRAY).setItalic(true);
+        player.sendMessage(tip);
     }
 
     public static TextComponentString prefix() {
         TextComponentString prefix = new TextComponentString("[Switchy] ");
         prefix.getStyle().setColor(TextFormatting.BLUE);
         return prefix;
+    }
+
+    private void handleComponentsCommand(EntityPlayerMP player, SwitchyPlayerData data, String[] args) throws CommandException {
+        if (args.length == 1) {
+            listComponents(player, data);
+            return;
+        }
+
+        String action = args[1].toLowerCase();
+        if (action.equals("enable") || action.equals("disable")) {
+            if (args.length < 3) {
+                throw new CommandException("Usage: /switchy components " + action + " <id>");
+            }
+            ResourceLocation id = parseId(args[2]);
+            if (action.equals("enable")) {
+                enableComponents(player, data, id);
+            } else {
+                disableComponents(player, data, id);
+            }
+        } else {
+            listComponents(player, data);
+        }
+    }
+
+    private void enableComponents(EntityPlayerMP player, SwitchyPlayerData data, ResourceLocation id) throws CommandException {
+        Set<SwitchyComponentType<?>> targets = resolveComponentTargets(id);
+        if (targets.isEmpty()) {
+            throw new CommandException("Component or group '" + id + "' not found.");
+        }
+
+        Set<SwitchyComponentType<?>> pending = targets.stream()
+            .filter(t -> !data.componentSet().contains(t))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        if (pending.isEmpty()) {
+            throw new CommandException("Component(s) already enabled.");
+        }
+
+        int added = data.initComponents(new LinkedHashSet<>(pending), player);
+        if (added <= 0) {
+            throw new CommandException("Failed to enable component(s). Check logs for details.");
+        }
+
+        TextComponentString message = prefix();
+        TextComponentString enabledText = new TextComponentString("Enabled ");
+        enabledText.getStyle().setColor(TextFormatting.GRAY);
+        message.appendSibling(enabledText);
+
+        TextComponentString count = new TextComponentString(String.valueOf(added));
+        count.getStyle().setColor(TextFormatting.GREEN);
+        message.appendSibling(count);
+
+        TextComponentString suffix = new TextComponentString(" component(s) for ");
+        suffix.getStyle().setColor(TextFormatting.GRAY);
+        message.appendSibling(suffix);
+
+        TextComponentString idText = new TextComponentString(id.toString());
+        idText.getStyle().setColor(TextFormatting.YELLOW);
+        message.appendSibling(idText);
+        player.sendMessage(message);
+    }
+
+    private void disableComponents(EntityPlayerMP player, SwitchyPlayerData data, ResourceLocation id) throws CommandException {
+        Set<SwitchyComponentType<?>> targets = resolveComponentTargets(id);
+        if (targets.isEmpty()) {
+            throw new CommandException("Component or group '" + id + "' not found.");
+        }
+
+        Set<SwitchyComponentType<?>> enabled = targets.stream()
+            .filter(t -> data.componentSet().contains(t))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        if (enabled.isEmpty()) {
+            throw new CommandException("Component(s) already disabled.");
+        }
+
+        int removed = data.removeComponents(enabled);
+        if (removed <= 0) {
+            throw new CommandException("Unable to disable component(s). One or more profiles may still contain precious data.");
+        }
+
+        TextComponentString message = prefix();
+        TextComponentString disabledText = new TextComponentString("Disabled ");
+        disabledText.getStyle().setColor(TextFormatting.GRAY);
+        message.appendSibling(disabledText);
+
+        TextComponentString count = new TextComponentString(String.valueOf(removed));
+        count.getStyle().setColor(TextFormatting.RED);
+        message.appendSibling(count);
+
+        TextComponentString suffix = new TextComponentString(" component(s) for ");
+        suffix.getStyle().setColor(TextFormatting.GRAY);
+        message.appendSibling(suffix);
+
+        TextComponentString idText = new TextComponentString(id.toString());
+        idText.getStyle().setColor(TextFormatting.YELLOW);
+        message.appendSibling(idText);
+        player.sendMessage(message);
+    }
+
+    private Set<SwitchyComponentType<?>> resolveComponentTargets(ResourceLocation id) {
+        SwitchyComponentTypes types = SwitchyComponentTypes.instance();
+        if (types == null) {
+            return Collections.emptySet();
+        }
+
+        Set<SwitchyComponentType<?>> groupMatches = types.values().stream()
+            .filter(t -> id.equals(t.group()))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        if (!groupMatches.isEmpty()) {
+            return groupMatches;
+        }
+
+        SwitchyComponentType<?> direct = types.get(id);
+        if (direct != null) {
+            Set<SwitchyComponentType<?>> single = new LinkedHashSet<>();
+            single.add(direct);
+            return single;
+        }
+
+        return Collections.emptySet();
+    }
+
+    private ResourceLocation parseId(String raw) throws CommandException {
+        try {
+            return new ResourceLocation(raw);
+        } catch (Exception e) {
+            throw new CommandException("Invalid resource location: " + raw);
+        }
+    }
+
+    private List<String> getComponentSuggestions(SwitchyPlayerData data, boolean onlyEnabled) {
+        SwitchyComponentTypes types = SwitchyComponentTypes.instance();
+        if (types == null) {
+            return Collections.emptyList();
+        }
+
+        Set<String> suggestions = new LinkedHashSet<>();
+        for (SwitchyComponentType<?> type : types.values()) {
+            boolean enabled = data.componentSet().contains(type);
+            if (enabled == onlyEnabled) {
+                if (type.group() != null) {
+                    suggestions.add(type.group().toString());
+                }
+                suggestions.add(types.id(type).toString());
+            }
+        }
+
+        return new ArrayList<>(suggestions);
     }
 }
