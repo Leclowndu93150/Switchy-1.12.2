@@ -68,6 +68,11 @@ public class MixinEntityPlayerMP implements SwitchyPlayer {
     }
 
     @Override
+    public void switchy$setPlayerData(SwitchyPlayerData data) {
+        switchy$playerData = data;
+    }
+
+    @Override
     public void switchy$clearHotSwap() {
         switchy$hotSwap = null;
     }

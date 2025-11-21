@@ -11,8 +11,13 @@ import dev.sisby.switchy.exception.ProfilePreciousException;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagDouble;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.nbt.NBTTagString;
+import net.minecraft.network.play.server.SPacketHeldItemChange;
+import net.minecraft.network.play.server.SPacketPlayerAbilities;
+import net.minecraft.network.play.server.SPacketSetExperience;
+import net.minecraft.network.play.server.SPacketUpdateHealth;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.Vec3d;
@@ -307,11 +312,12 @@ public class SwitchyPlayerData {
     public SwitchyProfile getOrCreateProfile(String profileId, EntityPlayerMP player) {
         if (profileExists(profileId)) return profiles.get(profileId);
         
+        NBTTagCompound defaultNbt = createDefaultPlayerNbt(player);
         SwitchyComponentMap components = SwitchyComponentMap.empty();
         
         for (SwitchyComponentType<?> componentType : componentTypes) {
             try {
-                componentType.tryInitialize(Collections.singletonList(components), new NBTTagCompound(), player, profileId);
+                componentType.tryInitialize(Collections.singletonList(components), defaultNbt, player, profileId);
             } catch (Exception e) {
                 Switchy.LOGGER.warn("Failed to initialize {} for {} profile {}", componentType.id(), player.getGameProfile().getName(), profileId, e);
             }
@@ -320,6 +326,38 @@ public class SwitchyPlayerData {
         SwitchyProfile newProfile = new SwitchyProfile(profileId, components);
         profiles.put(profileId, newProfile);
         return newProfile;
+    }
+    
+    private NBTTagCompound createDefaultPlayerNbt(EntityPlayerMP player) {
+        NBTTagCompound nbt = new NBTTagCompound();
+        
+        nbt.setTag("Inventory", new NBTTagList());
+        nbt.setTag("EnderItems", new NBTTagList());
+        nbt.setFloat("Health", player.getMaxHealth());
+        nbt.setInteger("foodLevel", 20);
+        nbt.setFloat("foodSaturationLevel", 5.0F);
+        nbt.setFloat("foodExhaustionLevel", 0.0F);
+        nbt.setInteger("XpLevel", 0);
+        nbt.setFloat("XpP", 0.0F);
+        nbt.setInteger("XpTotal", 0);
+        nbt.setTag("ActiveEffects", new NBTTagList());
+        
+        Vec3d spawnPos = new Vec3d(
+            player.getServerWorld().getSpawnPoint().getX() + 0.5,
+            player.getServerWorld().getSpawnPoint().getY() + 1,
+            player.getServerWorld().getSpawnPoint().getZ() + 0.5
+        );
+        NBTTagList posList = new NBTTagList();
+        posList.appendTag(new NBTTagDouble(spawnPos.x));
+        posList.appendTag(new NBTTagDouble(spawnPos.y));
+        posList.appendTag(new NBTTagDouble(spawnPos.z));
+        nbt.setTag("Pos", posList);
+        
+        nbt.setFloat("yaw", 0.0F);
+        nbt.setFloat("pitch", 0.0F);
+        nbt.setInteger("Dimension", player.dimension);
+        
+        return nbt;
     }
 
     public void validate(EntityPlayerMP self, NBTTagCompound nbt) {
@@ -400,23 +438,36 @@ public class SwitchyPlayerData {
             }
         }
 
-        this.greeting = greeting;
         current = nextProfile.id();
+        this.greeting = greeting;
 
+        player.readFromNBT(playerNbt);
+        // readFromNBT rehydrates a fresh SwitchyPlayerData instance, so keep our mutated data alive
+        ((SwitchyPlayer) player).switchy$setPlayerData(this);
+        updateFromPlayer(nextProfile, player);
+        
+        player.sendContainerToPlayer(player.inventoryContainer);
+        player.connection.sendPacket(new SPacketPlayerAbilities(player.capabilities));
+        player.connection.sendPacket(new SPacketUpdateHealth(player.getHealth(), player.getFoodStats().getFoodLevel(), player.getFoodStats().getSaturationLevel()));
+        player.connection.sendPacket(new SPacketSetExperience(player.experience, player.experienceTotal, player.experienceLevel));
+        player.connection.sendPacket(new SPacketHeldItemChange(player.inventory.currentItem));
+        
+        Switchy.LOGGER.info("[Switchy] Switched from {} to {}, current is now: {}", currentProfile.id(), nextProfile.id(), current);
+        
         TextComponentString prefix = new TextComponentString("[Switchy] ");
         prefix.getStyle().setColor(TextFormatting.BLUE);
         
-        TextComponentString message = new TextComponentString(selfSwitch ? "Updated current profile " : "Switching to ");
+        TextComponentString message = new TextComponentString(selfSwitch ? "Updated current profile " : "Switched to ");
         message.getStyle().setColor(TextFormatting.GRAY);
         prefix.appendSibling(message);
         
         prefix.appendSibling(SwitchyComponentTypes.NAME.asText(nextProfile.getOrGetDefault(SwitchyComponentTypes.NAME, SwitchyProfile::id)));
         
-        TextComponentString suffix = new TextComponentString("! Please reconnect.");
+        TextComponentString suffix = new TextComponentString("!");
         suffix.getStyle().setColor(TextFormatting.GRAY);
         prefix.appendSibling(suffix);
         
-        ((SwitchyPlayer) player).switchy$hotSwap(playerNbt, prefix);
+        player.sendMessage(prefix);
     }
 
     public static SwitchyPlayerData fromNbt(NBTTagCompound playerNbt) {

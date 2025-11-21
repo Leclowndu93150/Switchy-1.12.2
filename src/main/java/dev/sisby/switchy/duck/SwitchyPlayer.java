@@ -17,5 +17,7 @@ public interface SwitchyPlayer {
 
     SwitchyPlayerData switchy$getPlayerData();
 
+    void switchy$setPlayerData(SwitchyPlayerData data);
+
     void switchy$clearHotSwap();
 }
