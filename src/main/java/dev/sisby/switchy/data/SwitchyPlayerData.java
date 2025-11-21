@@ -307,13 +307,11 @@ public class SwitchyPlayerData {
     public SwitchyProfile getOrCreateProfile(String profileId, EntityPlayerMP player) {
         if (profileExists(profileId)) return profiles.get(profileId);
         
-        NBTTagCompound nbt = new NBTTagCompound();
-        player.writeToNBT(nbt);
         SwitchyComponentMap components = SwitchyComponentMap.empty();
         
         for (SwitchyComponentType<?> componentType : componentTypes) {
             try {
-                componentType.tryInitialize(Collections.singletonList(components), nbt, player, profileId);
+                componentType.tryInitialize(Collections.singletonList(components), new NBTTagCompound(), player, profileId);
             } catch (Exception e) {
                 Switchy.LOGGER.warn("Failed to initialize {} for {} profile {}", componentType.id(), player.getGameProfile().getName(), profileId, e);
             }
