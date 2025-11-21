@@ -390,8 +390,16 @@ public class SwitchyPlayerData {
             playerNbt = updateFromPlayer(currentProfile, player);
         }
         
+        Switchy.LOGGER.info("[Switchy] Applying {} components for profile {}", nextProfile.components().keySet().size(), nextProfile.id());
         for (SwitchyComponentType<?> componentType : nextProfile.components().keySet()) {
+            if (componentType == SwitchyComponentTypes.INVENTORY) {
+                Switchy.LOGGER.info("[Switchy] Before mutate inventory tag: {}", playerNbt.getTag("Inventory"));
+                Switchy.LOGGER.info("[Switchy] Applying inventory value: {}", nextProfile.components().get(componentType));
+            }
             componentType.tryMutate(nextProfile.components(), playerNbt, player);
+            if (componentType == SwitchyComponentTypes.INVENTORY) {
+                Switchy.LOGGER.info("[Switchy] After mutate inventory tag: {}", playerNbt.getTag("Inventory"));
+            }
         }
 
         this.greeting = greeting;

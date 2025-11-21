@@ -46,6 +46,7 @@ public class MixinEntityPlayerMP implements SwitchyPlayer {
     public void switchy$hotSwap(NBTTagCompound nbt, ITextComponent reason) {
         EntityPlayerMP self = (EntityPlayerMP) (Object) this;
         switchy$hotSwap = nbt;
+        Switchy.LOGGER.info("[Switchy] Queuing hot swap for {} with inventory {} and pos {}", self.getName(), nbt.getTag("Inventory"), nbt.getTag("Pos"));
         self.connection.disconnect(reason);
     }
 
@@ -64,6 +65,11 @@ public class MixinEntityPlayerMP implements SwitchyPlayer {
     @Override
     public SwitchyPlayerData switchy$getPlayerData() {
         return switchy$playerData;
+    }
+
+    @Override
+    public void switchy$clearHotSwap() {
+        switchy$hotSwap = null;
     }
 
     @Inject(method = "readEntityFromNBT", at = @At("RETURN"))

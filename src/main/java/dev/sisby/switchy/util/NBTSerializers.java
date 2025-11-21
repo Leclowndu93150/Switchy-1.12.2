@@ -59,17 +59,26 @@ public class NBTSerializers {
     public static final SwitchyComponentType.NBTSerializer<Vec3d> VEC3D = new SwitchyComponentType.NBTSerializer<Vec3d>() {
         @Override
         public NBTBase toNBT(Vec3d value) {
-            NBTTagCompound nbt = new NBTTagCompound();
-            nbt.setDouble("x", value.x);
-            nbt.setDouble("y", value.y);
-            nbt.setDouble("z", value.z);
-            return nbt;
+            NBTTagList list = new NBTTagList();
+            list.appendTag(new NBTTagDouble(value.x));
+            list.appendTag(new NBTTagDouble(value.y));
+            list.appendTag(new NBTTagDouble(value.z));
+            return list;
         }
 
         @Override
         public Vec3d fromNBT(NBTBase nbt) {
-            NBTTagCompound compound = (NBTTagCompound) nbt;
-            return new Vec3d(compound.getDouble("x"), compound.getDouble("y"), compound.getDouble("z"));
+            if (nbt instanceof NBTTagList) {
+                NBTTagList list = (NBTTagList) nbt;
+                double x = list.tagCount() > 0 ? list.getDoubleAt(0) : 0.0D;
+                double y = list.tagCount() > 1 ? list.getDoubleAt(1) : 0.0D;
+                double z = list.tagCount() > 2 ? list.getDoubleAt(2) : 0.0D;
+                return new Vec3d(x, y, z);
+            } else if (nbt instanceof NBTTagCompound) {
+                NBTTagCompound compound = (NBTTagCompound) nbt;
+                return new Vec3d(compound.getDouble("x"), compound.getDouble("y"), compound.getDouble("z"));
+            }
+            throw new ClassCastException("Expected list or compound for Vec3d, got " + nbt.getClass().getSimpleName());
         }
     };
 
